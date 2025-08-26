@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>VIOLET — Mobile Music PWA (Final Fixes 2)</title>
+  <title>VioletWave</title>
   <meta name="theme-color" content="#0b0220" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -173,12 +173,12 @@ input[type="range"]::-ms-thumb{
         <div class="flex items-center gap-3">
           <div class="w-11 h-11 rounded-2xl btn-main flex items-center justify-center font-bold text-lg">V</div>
           <div>
-            <div class="text-lg font-semibold">VIOLET</div>
-            <div class="text-xs text-zinc-400" id="statusLine">Müzik • Offline</div>
+            <div class="text-lg font-semibold">VioletWave</div>
+            <div class="text-xs text-zinc-400" id="statusLine">Yeni nesil müzik keyfi</div>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button id="installBtn" class="px-3 py-1.5 rounded-xl btn-ghost text-sm">Install</button>
+          <button id="installBtn" class="px-3 py-1.5 rounded-xl btn-ghost text-sm">Yükle</button>
         </div>
       </div>
 
@@ -422,7 +422,7 @@ input[type="range"]::-ms-thumb{
     menu.querySelectorAll('button').forEach(b=> b.addEventListener('click', async ()=>{
       const a=b.dataset.act;
       if(a==='play') playFromSearch(idx);
-      if(a==='download'){ if(b.disabled) { toast('Zaten indirildi'); } else { const ok = await downloadTrack(item.id); if(ok){ toast('İndirildi'); /* update menu text */ b.textContent='İndirildi ✓'; b.disabled=true; } else toast('İndirme başarısız'); } }
+      if(a==='download'){ if(b.disabled) { toast('Zaten indirildi'); } else { toast("İndirme işlemi başladı"); const ok = await downloadTrack(item.id); if(ok){ toast('İndirildi'); /* update menu text */ b.textContent='İndirildi ✓'; b.disabled=true; } else toast('İndirme başarısız'); } }
       if(a==='add') addToPlaylistPrompt(item.id);
       if(a==='share'){ state.current = await apiInfo(item.id); shareCurrent(); }
       menu.remove();
