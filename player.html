@@ -370,7 +370,7 @@ if ('serviceWorker' in navigator) {
   // ---------- Helpers & state ----------
   const LZ = { compressToEncodedURIComponent(s){ try{ return encodeURIComponent(btoa(unescape(encodeURIComponent(s)))); }catch(e){ return ''; } }, decompressFromEncodedURIComponent(c){ try{ return decodeURIComponent(escape(atob(decodeURIComponent(c)))); }catch(e){ return null; } } };
   const APP_ICON = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect rx="18" width="100%" height="100%" fill="%237c3aed"/></svg>';
-  let db; let swReg = null;
+  let db;
   async function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open('violet-db',7); r.onupgradeneeded = e=>{ const d=e.target.result; if(!d.objectStoreNames.contains('playlists')) d.createObjectStore('playlists',{keyPath:'id'}); if(!d.objectStoreNames.contains('tracks')) d.createObjectStore('tracks',{keyPath:'id'}); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
   async function idbInit(){ db = await openDB(); }
   function idbAll(store){ return new Promise(res=>{ const tx=db.transaction(store); const req=tx.objectStore(store).getAll(); req.onsuccess=()=>res(req.result||[]); req.onerror=()=>res([]); }); }
