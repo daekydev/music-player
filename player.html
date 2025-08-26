@@ -467,7 +467,7 @@ input[type="range"]::-ms-thumb{
       await showPlaybackNotification(meta, true);
       // ensure bpMenuDownload UI reflects cached state
       updateBpMenuButtons();
-    }catch(e){ console.warn(e); toast('Oynatma hatası'); }
+    }catch(e){ console.warn(e); }
   }
   function setNowPlaying(meta){
     $('#miniCover').src = meta.thumb||'';
