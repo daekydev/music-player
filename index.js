@@ -73,8 +73,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 try { app.use(favicon(path.join(__dirname, 'public','icons','icon-192.png'))); } catch(e){}
 
 
-import path from "path";
-import { fileURLToPath } from "url";
+
 
 // __dirname benzeri çözüm (ESM için)
 const __filename = fileURLToPath(import.meta.url);
