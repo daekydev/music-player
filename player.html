@@ -586,14 +586,7 @@ if ('serviceWorker' in navigator) {
 
   // ---------- SERVICE WORKER + notifications ----------
 
-    async function testNotif() {
-  await Notification.requestPermission();
-  const reg = await navigator.serviceWorker.getRegistration();
-  if (!reg) return console.log('SW bulunamadı');
-  reg.showNotification('Test Notification', { body:'Çalışıyor mu?', silent:true });
-}
-
-testNotif();
+    
 
 
   async function showPlaybackNotification(meta, isPlaying){
@@ -605,16 +598,24 @@ testNotif();
       if(!reg) return;
       const icon = meta.thumb || APP_ICON;
       const options = {
-        body: meta.artist || '-',
-        icon: icon || '',
-        badge: APP_ICON || '',
+        body: (meta.artist || '-'),
+        icon: icon,
+        badge: APP_ICON,
         tag: 'now-playing',
         renotify: true,
-        data: { id: meta.id || '', title: meta.title, artist: meta.artist }
-      };
+              };
       await reg.showNotification(meta.title || 'Çalıyor', options);
     }catch(e){ console.warn('notif show fail', e); }
   }
+
+   async function updateUI(meta){
+  if('mediaSession' in navigator){
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: meta.title, artist: meta.artist||'', album: 'SLP Player',
+      artwork: [{ src: meta.thumb||'/icons/logo.png', sizes:'512x512', type:'image/png' }]
+    });
+  }
+    }
 
   if('serviceWorker' in navigator){
     navigator.serviceWorker.addEventListener('message', (e)=>{ try{ if(!e.data) return; if(e.data.type === 'notification-action'){ const a = e.data.action; if(a === 'prev') prevTrack(); else if(a === 'next') nextTrack(); else if(a === 'toggle'){ if(audio.paused) audio.play(); else audio.pause(); } } }catch(err){} });
