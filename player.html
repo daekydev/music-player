@@ -494,7 +494,8 @@ if ('serviceWorker' in navigator) {
       showMini(true);
       await applyCoverBlur(meta.thumb);
       await setMediaSession(meta);
-      await showPlaybackNotification(meta, true);
+      await showPlaybackNotification(meta, true).catch(e => console.log('Bildirim hatası:', e));
+    
       // ensure bpMenuDownload UI reflects cached state
       updateBpMenuButtons();
     }catch(e){ console.warn(e); }
@@ -604,18 +605,12 @@ testNotif();
       if(!reg) return;
       const icon = meta.thumb || APP_ICON;
       const options = {
-        body: meta.artist || '',
+        body: meta.artist || '-',
         icon: icon || '',
         badge: APP_ICON || '',
         tag: 'now-playing',
         renotify: true,
-        silent: true,
-        data: { id: meta.id || '', title: meta.title, artist: meta.artist },
-        actions: [
-          {action:'prev', title:'Önceki'},
-          {action:'toggle', title: isPlaying? 'Durdur' : 'Oynat'},
-          {action:'next', title:'Sonraki'}
-        ]
+        data: { id: meta.id || '', title: meta.title, artist: meta.artist }
       };
       await reg.showNotification(meta.title || 'Çalıyor', options);
     }catch(e){ console.warn('notif show fail', e); }
