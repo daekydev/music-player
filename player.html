@@ -340,7 +340,32 @@ input[type="range"]::-ms-thumb{
   </div>
 
   <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+   let swReg = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      swReg = await navigator.serviceWorker.register('/sw.js');
+      console.log('SW kayıt başarılı:', swReg.scope);
+    } catch (err) {
+      console.error('SW kayıt hatası:', err);
+    }
+
+    navigator.serviceWorker.addEventListener('message', e => {
+      try {
+        if (!e.data) return;
+        if (e.data.type === 'notification-action') {
+          const a = e.data.action;
+          if (a === 'prev') prevTrack();
+          else if (a === 'next') nextTrack();
+          else if (a === 'toggle') audio.paused ? audio.play() : audio.pause();
+        }
+      } catch (err) {}
+    });
+  });
+}
+
+
     
   // ---------- Helpers & state ----------
   const LZ = { compressToEncodedURIComponent(s){ try{ return encodeURIComponent(btoa(unescape(encodeURIComponent(s)))); }catch(e){ return ''; } }, decompressFromEncodedURIComponent(c){ try{ return decodeURIComponent(escape(atob(decodeURIComponent(c)))); }catch(e){ return null; } } };
