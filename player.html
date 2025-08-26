@@ -340,6 +340,8 @@ input[type="range"]::-ms-thumb{
   </div>
 
   <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+    
   // ---------- Helpers & state ----------
   const LZ = { compressToEncodedURIComponent(s){ try{ return encodeURIComponent(btoa(unescape(encodeURIComponent(s)))); }catch(e){ return ''; } }, decompressFromEncodedURIComponent(c){ try{ return decodeURIComponent(escape(atob(decodeURIComponent(c)))); }catch(e){ return null; } } };
   const APP_ICON = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect rx="18" width="100%" height="100%" fill="%237c3aed"/></svg>';
@@ -554,33 +556,7 @@ input[type="range"]::-ms-thumb{
   }
 
   // ---------- SERVICE WORKER + notifications ----------
-  async function registerSW(){
-    if(!('serviceWorker' in navigator)) return null;
-    try{
-      const swCode = `
-        self.addEventListener('install', e=>self.skipWaiting());
-        self.addEventListener('activate', e=>self.clients.claim());
-        self.addEventListener('notificationclick', function(event){
-          event.notification.close();
-          const action = event.action || 'default';
-          event.waitUntil(
-            clients.matchAll({includeUncontrolled:true, type:'window'}).then(function(clientList){
-              if(clientList.length>0){
-                clientList[0].postMessage({type:'notification-action', action:action});
-              } else {
-                clients.openWindow('/');
-              }
-            })
-          );
-        });
-      `;
-      const blob = new Blob([swCode], {type:'application/javascript'}); const url = URL.createObjectURL(blob);
-      const reg = await navigator.serviceWorker.register(url);
-      await navigator.serviceWorker.ready;
-      swReg = reg;
-      return reg;
-    }catch(e){ console.warn('sw reg error', e); return null; }
-  }
+  
 
   async function showPlaybackNotification(meta, isPlaying){
     try{
