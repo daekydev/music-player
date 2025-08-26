@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VIOLET — Mobile Music PWA (Final Fixes 2)</title>
+  <meta name="theme-color" content="#0b0220" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{--bg:#06060a;--glass:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));--accent1:#7c3aed;--accent2:#9f7aea}
+    html,body,#app{height:100%}
+    body{margin:0;background:radial-gradient(800px 600px at 10% 10%, rgba(124,58,237,0.10), transparent), var(--bg); color:#fff; font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial}
+    .glass{background:var(--glass);backdrop-filter: blur(10px); border:1px solid rgba(255,255,255,0.03)}
+    .card-shadow{box-shadow:0 18px 50px rgba(0,0,0,0.6)}
+    .safe-bottom{padding-bottom:calc(env(safe-area-inset-bottom) + 120px)}
+    .btn-main{background:linear-gradient(90deg,var(--accent1),var(--accent2)); color:#06060a}
+    .btn-ghost{background:rgba(255,255,255,0.03)}
+    .icon-btn{width:46px;height:46px;border-radius:12px;display:grid;place-items:center}
+    .icon-btn.on{background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#06060a}
+    .lift{transition:transform .22s ease, box-shadow .22s ease}
+    .cover-shadow{box-shadow:0 18px 60px rgba(124,58,237,0.22)}
+    .fade-in{animation:fadeIn .22s ease both}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6%)}to{opacity:1;transform:translateY(0)}}
+    .sheet-enter{transform:translateY(24px);opacity:0}
+    .sheet-show{transform:translateY(0);opacity:1;transition:transform .28s cubic-bezier(.2,.9,.3,1),opacity .28s}
+    .bp-enter{transform:translateY(12px) scale(.98);opacity:0}
+    .bp-show{transform:translateY(0) scale(1);opacity:1;transition:transform .32s cubic-bezier(.2,.9,.3,1),opacity .32s}
+    .center-grid{display:grid;place-items:center}
+    .context-menu{position:absolute;min-width:160px;border-radius:12px;padding:6px;background:rgba(12,12,15,0.45);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.04);z-index:9999}
+    .context-menu button{width:100%;text-align:left;padding:8px;border-radius:8px;background:transparent;border:0;color:inherit}
+    .bottom-sheet{position:fixed;left:12px;right:12px;border-top-left-radius:18px;border-top-right-radius:18px;background:linear-gradient(180deg, #0b0b0f, #070708);box-shadow:0 -18px 50px rgba(0,0,0,0.6);z-index:9998}
+    .sheetClose{position:absolute;right:12px;top:10px;background:transparent;border:0;color:inherit;font-size:20px;padding:6px;z-index:10005}
+    
+    @media (min-width:900px){ .mobile-only{display:none} }
+    @media (max-width:899px){ .desktop-only{display:none} }
+
+    /* ---------- Big Player fixes (square cover + no extra gap) ---------- */
+    /* topbar height sabit */
+    .bp-topbar{position:absolute;left:0;right:0;top:0;height:64px;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;z-index:10010}
+
+    /* big backdrop: bütün sayfayı koyu ve blur ile kaplar (arka planı itmez) */
+    .big-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.60);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);z-index:59}
+
+    /* cover blur layer, absolute ve arkaplanı kaplar; layout'u etkilemez */
+    .bp-blur{position:fixed;inset:0;background-size:cover;background-position:center;filter:blur(28px) saturate(1.05);transform:scale(1.04);z-index:58;opacity:0.92;}
+
+    /* layer content (controls + cover) - overlay'in üstünde */
+    .bp-layer{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-start;justify-content:center;padding-top:84px;pointer-events:auto}
+
+    /* shell-content: kapsayıcı, controls'ı kapağı zorlamayacak şekilde düzenlendi */
+    .bp-shell-content{width:100%;max-width:960px;display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 20px;box-sizing:border-box;}
+
+    /* square responsive cover: viewport'a göre büyür ama hep kare */
+    .bp-cover { width:64vw; max-width:360px; height:64vw; max-height:360px; border-radius:14px; object-fit:cover; object-position:center center; box-shadow:0 18px 60px rgba(124,58,237,0.22); }
+
+    /* title area hafif yukarıda, controls hemen alt */
+    .bp-meta{margin-top:0;margin-bottom:2px;text-align:center}
+
+    /* seek + controls kapsayıcı: gereksiz margin kaldırıldı, controls kapakla yakın olacak */
+    .bp-controls-wrap{width:100%;max-width:720px;margin-top:4px;padding-top:6px;}
+
+    /* controls satırı: ikonlar merkezde ve kapaktan aşağı hemen görünür */
+    .bp-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0}
+
+    /* loop badge ve icon pozisyon korumaları */
+    .loop-badge{position:absolute;right:6px;top:6px;background:rgba(0,0,0,0.6);padding:2px 6px;border-radius:999px;font-size:11px;z-index:10011}
+
+    /* menü topbar içinde kalacak, sol-sağ taşma engellendi */
+    #bpMenu{position:absolute;right:0;top:44px;transform:none}
+
+    /* responsive: dar ekranlarda kapak daha küçük */
+    @media (max-width:420px){
+      .bp-cover{ width:72vw; height:72vw; max-width:260px; max-height:260px; }
+      .bp-layer{ padding-top:72px }
+    }
+
+    /* ----- Centered range (thumb exactly centered on track) ----- */
+    /* Ayarlar: değiştirmek istersen burayı düzenle */
+    :root {
+      --range-thumb-size: 18px;   /* thumb çapı */
+      --range-track-size: 6px;    /* görünür track yüksekliği */
+      --violet-rgb: 124,58,237;   /* accent (rgb) */
+    }
+
+    /* Temel: thumb büyüklüğüne göre input yüksekliği ayarlı */
+    input[type="range"]{
+      -webkit-appearance:none;
+      appearance:none;
+      width:100%;
+      height: 6px;   /* input yüksekliği = thumb yüksekliği */
+      background: transparent;
+      padding: 0; /* bazı tarayıcılarda boşluk etkisi olmasın */
+      box-sizing: border-box;
+    }
+
+    /* WebKit track: yükseklik küçük, ortalanmış olacak */
+    input[type="range"]::-webkit-slider-runnable-track{
+      height: var(--range-track-size);
+      border-radius: 999px;
+      background: transparent; /* JS ile dolu kısmı gradient ile ayarlıyoruz */
+      margin-top: calc((var(--range-thumb-size) - var(--range-track-size)) / 2); /* track'i input içinde ortala */
+    }
+
+    /* WebKit thumb: artık margin-top gerekmiyor */
+    input[type="range"]::-webkit-slider-thumb{
+      -webkit-appearance:none;
+      width: var(--range-thumb-size);
+      height: var(--range-thumb-size);
+      border-radius: 999px;
+      background: #fff;
+      border: 2px solid rgba(var(--violet-rgb),0.95);
+      box-shadow: 0 6px 18px rgba(var(--violet-rgb),0.12);
+      margin-top: 0; /* track zaten ortalanmış durumda */
+      position: relative;
+      z-index: 3;
+    }
+
+    /* Firefox */
+    input[type="range"]::-moz-range-track{
+      height: var(--range-track-size);
+      border-radius: 999px;
+      background: transparent;
+    }
+    input[type="range"]::-moz-range-thumb{
+      width: var(--range-thumb-size);
+      height: 6px;
+      border-radius: 999px;
+      background: #fff;
+      border: 2px solid rgba(var(--violet-rgb),0.95);
+      box-shadow: 0 6px 18px rgba(var(--violet-rgb),0.12);
+      margin-top: 0;
+    }
+
+    /* IE/Edge legacy (iyileştirme) */
+    input[type="range"]::-ms-track{
+      height: var(--range-track-size);
+      background: transparent;
+      border-color: transparent;
+      color: transparent;
+    }
+    input[type="range"]::-ms-thumb{
+      width: var(--range-thumb-size);
+      height: var(--range-thumb-size);
+    }
+
+    /* responsive küçük thumb */
+    @media (max-width:420px){
+      :root { --range-thumb-size: 16px; --range-track-size:5px; }
+    }
+    /* Minimal düzeltme — yalnızca thumb'ı dikey ortalar (ekle / mevcutun altına yapıştır) */
+input[type="range"]::-webkit-slider-thumb{
+  /* border'ı da hesaba katarak biraz daha aşağı kaydırıyoruz (çoğu durumda -8px iyi olur) */
+  margin-top: -8px !important;
+}
+
+/* Firefox: margin-top desteklemediğinden translateY ile taşıyoruz */
+input[type="range"]::-moz-range-thumb{
+  transform: translateY(-8px);
+}
+
+/* Edge/IE (legacy) için de transform uygulayalım */
+input[type="range"]::-ms-thumb{
+  transform: translateY(-8px);
+}
+    
+
+    </style>
+</head>
+<body>
+  <div id="app" class="min-h-screen safe-bottom">
+    <div class="p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl btn-main flex items-center justify-center font-bold text-lg">V</div>
+          <div>
+            <div class="text-lg font-semibold">VIOLET</div>
+            <div class="text-xs text-zinc-400" id="statusLine">Müzik • Offline</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="installBtn" class="px-3 py-1.5 rounded-xl btn-ghost text-sm">Install</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3">
+        <div class="glass rounded-xl p-3 card-shadow lift">
+          <div class="flex gap-3 items-center">
+            <input id="searchInput" class="flex-1 bg-transparent border-none text-white placeholder:text-zinc-400 text-sm" placeholder="Şarkı, sanatçı ya da ID (örn: 4NRXx6U8ABQ)"/>
+            <button id="searchBtn" class="px-4 py-2 rounded-xl btn-main text-sm">Ara</button>
+          </div>
+        </div>
+
+        <div class="glass rounded-xl p-3 card-shadow lift">
+          <div class="flex gap-2">
+            <input id="newPlaylistName" placeholder="Yeni liste adı" class="flex-1 bg-transparent text-white placeholder:text-zinc-400 text-sm"/>
+            <button id="createPlaylistBtn" class="px-4 py-2 rounded-xl btn-main text-sm">Oluştur</button>
+          </div>
+        </div>
+
+        <div id="offlinePlane" class="glass rounded-xl p-3 card-shadow lift">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-sm font-medium">Offline Mod</div>
+              <div class="text-xs text-zinc-400">Açınca yalnızca indirilenler gösterilir</div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input id="offlineToggle" type="checkbox" class="sr-only" />
+              <div id="offlineTrack" class="w-12 h-6 rounded-full bg-zinc-800 relative transition-all"></div>
+              <span id="offlineDot" class="absolute left-1 top-1 w-4 h-4 bg-zinc-300 rounded-full transition-all"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main id="mainContent" class="px-4 pb-48">
+      <section class="mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold">Çalma Listeleri</h2>
+        </div>
+        <div id="playlists" class="space-y-3"></div>
+      </section>
+
+      <section>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-base font-semibold">Sonuçlar</h2>
+        </div>
+        <div id="results" class="space-y-3"></div>
+      </section>
+    </main>
+
+    <!-- Mini Player (docked bottom bar) -->
+    <div id="miniBarWrap" class="fixed inset-x-4 bottom-4 z-50">
+      <div class="glass rounded-2xl card-shadow overflow-hidden">
+        <div id="miniBar" class="flex items-center gap-3 px-3 py-2">
+          <img id="miniCover" src="" class="w-12 h-12 rounded-lg object-cover"/>
+          <div class="flex-1 min-w-0">
+            <div id="miniTitle" class="font-medium text-sm truncate">Henüz çalmıyor</div>
+            <div id="miniArtist" class="text-xs text-zinc-400 truncate">—</div>
+            <div id="miniProgressWrap" class="w-full mt-2 hidden"><input id="miniSeek" type="range" min="0" max="100" value="0" class="w-full"/></div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="miniPrev" class="icon-btn btn-ghost" title="Önceki">
+              <svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M11 19V5L4 12l7 7zM20 19V5h-2v14h2z" fill="currentColor"/></svg>
+            </button>
+            <button id="miniPlay" class="w-12 h-12 rounded-xl btn-main center-grid" title="Oynat/Durdur">
+              <svg id="miniPlayIcon" viewBox="0 0 24 24" class="w-6 h-6"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+            </button>
+            <button id="miniNext" class="icon-btn btn-ghost" title="Sonraki">
+              <svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M13 5v14l7-7-7-7zM4 5v14h2V5H4z" fill="currentColor"/></svg>
+            </button>
+            <button id="miniExpand" class="icon-btn btn-ghost" title="Büyük oynatıcıya git">
+              <svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
+  <!-- Big Player overlay (full screen) - REPLACE ENTIRE BLOCK -->
+    <div id="bigPlayer" aria-hidden="true" class="hidden">
+      <!-- dark blur backdrop that doesn't push layout -->
+      <div class="big-backdrop" id="bpBackdrop" style="display:none"></div>
+
+      <!-- blur layer derived from cover image (fixed, under content) -->
+      <div id="bpBg" class="bp-blur" aria-hidden="true" style="display:none"></div>
+
+      <!-- content layer over the backdrop -->
+      <div id="bpLayer" class="bp-layer" style="display:none">
+        <!-- topbar: close left, menu right (always above cover) -->
+        <div class="bp-topbar">
+          <div class="left">
+            <button id="bpClose" class="p-2 rounded-xl btn-ghost" title="Kapat">×</button>
+          </div>
+          <div class="right" style="position:relative">
+            <button id="bpMenuBtn" class="p-2 rounded-xl btn-ghost">⋯</button>
+            <div id="bpMenu" class="hidden mt-2 w-44 bg-zinc-900/80 border border-zinc-800 rounded-xl p-2 text-left glass">
+              <button id="bpMenuDownload" data-action="download" class="block w-full text-left px-3 py-2 rounded hover:bg-zinc-800">İndir</button>
+              <button data-action="share" class="block w-full text-left px-3 py-2 rounded hover:bg-zinc-800">Paylaş</button>
+              <button data-action="add" class="block w-full text-left px-3 py-2 rounded hover:bg-zinc-800">Listeye ekle</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- shell content: cover + meta + controls -->
+        <div id="bpShell" class="bp-shell-content">
+          <!-- cover (square, center-cropped) -->
+          <img id="bpCover" src="" class="bp-cover" alt="Kapak"/>
+
+          <!-- title / artist -->
+          <div class="bp-meta">
+            <div id="bpTitle" class="text-lg font-semibold"></div>
+            <div id="bpArtist" class="text-xs text-zinc-400"></div>
+          </div>
+
+          <!-- seek + time -->
+          <div class="bp-controls-wrap">
+            <input id="bpSeek" type="range" min="0" max="100" value="0" class="w-full"/>
+            <div class="flex justify-between text-xs text-zinc-400 mt-1 mb-2">
+              <span id="bpCur">0:00</span>
+              <span id="bpDur">0:00</span>
+            </div>
+
+            <!-- controls row -->
+            <div class="bp-controls">
+              <button id="bpShuffle" class="icon-btn btn-ghost" title="Karıştır">
+                <svg id="shuffleIcon" viewBox="0 0 24 24" class="w-5 h-5"><path d="M3 6h4l6 8 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 6v6h-6" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+
+              <div class="flex items-center gap-4">
+                <button id="bpPrev" class="icon-btn btn-ghost" title="Önceki">
+                  <svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M11 19V5L4 12l7 7zM20 19V5h-2v14h2z" fill="currentColor"/></svg>
+                </button>
+
+                <button id="bpPlay" class="w-16 h-16 rounded-xl btn-main center-grid" title="Oynat/Durdur">
+                  <svg id="bpPlayIcon" viewBox="0 0 24 24" class="w-6 h-6"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                </button>
+
+                <button id="bpNext" class="icon-btn btn-ghost" title="Sonraki">
+                  <svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M13 5v14l7-7-7-7zM4 5v14h2V5H4z" fill="currentColor"/></svg>
+                </button>
+              </div>
+
+              <div style="position:relative">
+                <button id="bpLoop" class="icon-btn btn-ghost relative" title="Döngü">
+                  <span id="loopIconWrap">
+                    <svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M21 15v4h-4M3 9V5h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>
+                  </span>
+                  <span id="loopBadge" class="loop-badge hidden">1</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <audio id="audio" preload="metadata"></audio>
+    </div>
+  </div>
+
+  <script>
+  // ---------- Helpers & state ----------
+  const LZ = { compressToEncodedURIComponent(s){ try{ return encodeURIComponent(btoa(unescape(encodeURIComponent(s)))); }catch(e){ return ''; } }, decompressFromEncodedURIComponent(c){ try{ return decodeURIComponent(escape(atob(decodeURIComponent(c)))); }catch(e){ return null; } } };
+  const APP_ICON = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96"><rect rx="18" width="100%" height="100%" fill="%237c3aed"/></svg>';
+  let db; let swReg = null;
+  async function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open('violet-db',7); r.onupgradeneeded = e=>{ const d=e.target.result; if(!d.objectStoreNames.contains('playlists')) d.createObjectStore('playlists',{keyPath:'id'}); if(!d.objectStoreNames.contains('tracks')) d.createObjectStore('tracks',{keyPath:'id'}); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  async function idbInit(){ db = await openDB(); }
+  function idbAll(store){ return new Promise(res=>{ const tx=db.transaction(store); const req=tx.objectStore(store).getAll(); req.onsuccess=()=>res(req.result||[]); req.onerror=()=>res([]); }); }
+  function idbGet(store,key){ return new Promise(res=>{ const tx=db.transaction(store); const req=tx.objectStore(store).get(key); req.onsuccess=()=>res(req.result); req.onerror=()=>res(null); }); }
+  function idbPut(store,obj){ return new Promise(res=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(obj); tx.oncomplete=()=>res(); }); }
+  function idbDelete(store,key){ return new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); const req=tx.objectStore(store).delete(key); req.onsuccess=()=>res(true); req.onerror=()=>rej(req.error); }); }
+
+  const audio = document.getElementById('audio');
+  let state = { queue:[], index:-1, shuffle:false, loop:'off', offline:false, current:null, _artUrl:null };
+  let lastSearchResults = [];
+
+  const $ = s => document.querySelector(s);
+  function toast(msg, ms=1400){ const t=document.createElement('div'); t.className='fixed bottom-36 left-1/2 -translate-x-1/2 bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-xl z-[30000]'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),ms); }
+
+  // ---------- UI helpers ----------
+  function updateOfflineToggleVisual(on){
+    const track = $('#offlineTrack'), dot = $('#offlineDot');
+    if(on){ track.classList.add('bg-violet-600'); track.classList.remove('bg-zinc-800'); dot.style.left = 'calc(100% - 1rem)'; dot.style.background = '#fff'; } else { track.classList.remove('bg-violet-600'); track.classList.add('bg-zinc-800'); dot.style.left = '0.25rem'; dot.style.background = '#c4c4c4'; }
+    $('#statusLine').textContent = `Müzik • ${on ? 'Offline' : 'Online'}`;
+  }
+
+  // ---------- Network auto-offline ----------
+  window.addEventListener('offline', ()=>{ state.offline = true; $('#offlineToggle').checked = true; updateOfflineToggleVisual(true); renderOfflineList(); toast('İnternet bağlantısı yok — offline mod açıldı'); });
+  window.addEventListener('online', ()=>{ state.offline = false; $('#offlineToggle').checked = false; updateOfflineToggleVisual(false); if($('#searchInput').value.trim()) doSearch($('#searchInput').value.trim()); else $('#results').innerHTML = '<div class="text-zinc-400 py-3">Arama yap</div>'; toast('Çevrimiçi'); });
+
+  $('#offlineToggle').addEventListener('change', async (e)=>{ state.offline = e.target.checked; updateOfflineToggleVisual(state.offline); if(state.offline) await renderOfflineList(); else { if($('#searchInput').value.trim()) doSearch($('#searchInput').value.trim()); else $('#results').innerHTML = '<div class="text-zinc-400 py-3">Arama yap</div>'; } });
+
+  // ---------- API helpers ----------
+  async function apiSearch(q){ const r = await fetch(`https://music-player-seven-peach.vercel.app/api/search?q=${encodeURIComponent(q)}`); const j = await r.json(); return j.results || []; }
+  async function apiInfo(id){ const r = await fetch(`https://music-player-seven-peach.vercel.app/info/${id}`); const j = await r.json(); const b=j.result?.basic_info||{}; return { id:b.id||id, title:b.title||'Unknown', artist:b.author||'', duration:b.duration||0, thumb:(b.thumbnail && b.thumbnail[0]?.url)||'' }; }
+  function streamUrl(id){ return `https://music-player-seven-peach.vercel.app/stream/${id}`; }
+
+  // ---------- Rendering results ----------
+  async function doSearch(q){
+    if(state.offline){
+      const all = await idbAll('tracks');
+      const filtered = all.filter(t=>t.cached).filter(t=> (t.title||'').toLowerCase().includes(q.toLowerCase()) || (t.artist||'').toLowerCase().includes(q.toLowerCase()));
+      lastSearchResults = filtered.map(t=>({id:t.id,title:t.title,author:t.artist,thumbnail:t.thumb,duration:t.duration}));
+      renderResultsFromObjects(lastSearchResults);
+    } else {
+      const data = await apiSearch(q);
+      const mapped = data.map(x=>({ title:x.title, author:x.author||'', thumbnail:x.thumbnail||'', duration:x.duration||'', id:(x.url? (function(u){ try{ const U=new URL(u); return U.searchParams.get('v')||U.pathname.split('/').pop(); }catch{ return x.id||u } })(x.url): (x.id||x)) }));
+      lastSearchResults = mapped;
+      renderResultsFromObjects(mapped);
+    }
+  }
+
+  async function renderOfflineList(){ const all = await idbAll('tracks'); const list = all.filter(t=>t.cached).map(t=>({ id:t.id, title:t.title, author:t.artist, thumbnail:t.thumb, duration:t.duration })); lastSearchResults = list; renderResultsFromObjects(list); }
+
+  function renderResultsFromObjects(list){
+    const wrap = $('#results'); wrap.innerHTML=''; if(!list.length){ wrap.innerHTML = '<div class="text-zinc-400 py-3">Görüntülenecek şarkı yok</div>'; return; }
+    list.forEach((it,idx)=>{
+      const node=document.createElement('div');
+      node.className='glass rounded-xl p-3 flex items-center gap-3 lift';
+      node.innerHTML = `<img src="${it.thumbnail||''}" class="w-14 h-14 rounded-lg object-cover"/><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">${it.title}</div><div class="text-xs text-zinc-400 truncate">${it.author||''} • ${it.duration||''}</div></div><div class="flex items-center gap-2"><button class="playBtn px-3 py-2 rounded-xl btn-main">Çal</button><button class="moreBtn px-3 py-2 rounded-xl btn-ghost">⋯</button></div>`;
+      wrap.appendChild(node);
+      node.querySelector('.playBtn').addEventListener('click', ()=> playFromSearch(idx));
+      node.querySelector('.moreBtn').addEventListener('click', (e)=> openResultMenu(e.currentTarget, it, idx));
+    });
+  }
+
+  // ---------- Context menu anchored above (download disabled if cached) ----------
+  async function openResultMenu(buttonEl,item,idx){
+    document.querySelectorAll('.context-menu').forEach(n=>n.remove());
+    const isCached = !!(await idbGet('tracks', item.id))?.cached;
+    const menu=document.createElement('div'); menu.className='context-menu glass';
+    menu.innerHTML = `<button data-act="play">Çal</button>
+                      <button data-act="download" ${isCached? 'disabled' : ''}>${isCached? 'İndirildi ✓' : 'İndir'}</button>
+                      <button data-act="add">Listeye ekle</button>
+                      <button data-act="share">Paylaş</button>`;
+    document.body.appendChild(menu);
+    const rect=buttonEl.getBoundingClientRect(); const mrect=menu.getBoundingClientRect();
+    let top = rect.top - mrect.height - 8 + window.scrollY; if(top < 8) top = rect.bottom + 8 + window.scrollY;
+    let left = rect.right - mrect.width + window.scrollX; if(left < 8) left = 8;
+    menu.style.top = top + 'px'; menu.style.left = left + 'px';
+    menu.querySelectorAll('button').forEach(b=> b.addEventListener('click', async ()=>{
+      const a=b.dataset.act;
+      if(a==='play') playFromSearch(idx);
+      if(a==='download'){ if(b.disabled) { toast('Zaten indirildi'); } else { const ok = await downloadTrack(item.id); if(ok){ toast('İndirildi'); /* update menu text */ b.textContent='İndirildi ✓'; b.disabled=true; } else toast('İndirme başarısız'); } }
+      if(a==='add') addToPlaylistPrompt(item.id);
+      if(a==='share'){ state.current = await apiInfo(item.id); shareCurrent(); }
+      menu.remove();
+    }));
+    setTimeout(()=>{ window.addEventListener('click', closeOnDoc); });
+    function closeOnDoc(e){ if(!menu.contains(e.target) && e.target !== buttonEl){ menu.remove(); window.removeEventListener('click', closeOnDoc); } }
+  }
+
+  // ---------- Queue play ----------
+  function playFromSearch(index){
+    if(!lastSearchResults || !lastSearchResults.length) return;
+    let ids = lastSearchResults.map(x=>x.id);
+    if(state.shuffle) ids = shuffleArray(ids);
+    const startId = lastSearchResults[index].id;
+    let startIndex = ids.indexOf(startId);
+    if(startIndex<0) startIndex=0;
+    const q = ids.slice(startIndex).concat(ids.slice(0,startIndex));
+    state.queue = q; state.index = 0; playById(state.queue[state.index], state.queue);
+  }
+  function shuffleArray(a){ const arr=a.slice(); for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+  // ---------- Play + queue + mediaSession + notification ----------
+  async function playById(id, queue){
+    try{
+      let meta = state.offline ? await idbGet('tracks',id) : null;
+      if(!meta){
+        meta = await apiInfo(id);
+        // store minimal meta so playlists show info (cached=false unless previously cached)
+        try{ const existing = await idbGet('tracks', id); if(!existing) await idbPut('tracks', Object.assign({cached:false}, meta)); else { /* merge missing */ existing.title = existing.title || meta.title; existing.artist = existing.artist || meta.artist; existing.thumb = existing.thumb || meta.thumb; existing.duration = existing.duration || meta.duration; await idbPut('tracks', existing); } }catch(e){}
+      }
+      if(!meta) return toast('Meta yok');
+      state.current = meta;
+      setNowPlaying(meta);
+      if(Array.isArray(queue)) state.queue = queue.slice(); else if(!state.queue || !state.queue.length) state.queue = [id];
+      state.index = state.queue.indexOf(id); if(state.index<0) state.index = 0;
+      audio.src = streamUrl(id);
+      await audio.play();
+      setPlayIcon(true);
+      showMini(true);
+      await applyCoverBlur(meta.thumb);
+      await setMediaSession(meta);
+      await showPlaybackNotification(meta, true);
+      // ensure bpMenuDownload UI reflects cached state
+      updateBpMenuButtons();
+    }catch(e){ console.warn(e); toast('Oynatma hatası'); }
+  }
+  function setNowPlaying(meta){
+    $('#miniCover').src = meta.thumb||'';
+    $('#miniTitle').textContent = meta.title||'—';
+    $('#miniArtist').textContent = meta.artist||'';
+    $('#bpCover').src = meta.thumb||'';
+    $('#bpTitle').textContent = meta.title||'';
+    $('#bpArtist').textContent = meta.artist||'';
+    $('#bpDur').textContent = fmtTime(meta.duration||0);
+  }
+  function fmtTime(s){ if(!s||!isFinite(s)) return '0:00'; s=Math.floor(s); return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+  function setPlayIcon(playing){ const p = playing? '<path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/>' : '<path d="M8 5v14l11-7z" fill="currentColor"/>'; $('#miniPlayIcon').innerHTML=p; $('#bpPlayIcon').innerHTML=p; if('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'; }
+
+  function nextTrack(){ if(!state.queue || !state.queue.length) return; if(state.shuffle) state.index = Math.floor(Math.random()*state.queue.length); else { state.index++; if(state.index >= state.queue.length){ if(state.loop==='all') state.index = 0; else { audio.pause(); setPlayIcon(false); return; } } } playById(state.queue[state.index], state.queue); }
+  function prevTrack(){ if(!state.queue || !state.queue.length) return; if(state.shuffle) state.index = Math.floor(Math.random()*state.queue.length); else state.index = Math.max(0, state.index-1); playById(state.queue[state.index], state.queue); }
+
+  audio.addEventListener('timeupdate', ()=>{ if(audio.duration){ const pct=(audio.currentTime/audio.duration)*100; $('#bpSeek').value = pct; $('#miniSeek').value = pct; $('#bpCur').textContent = fmtTime(audio.currentTime); } });
+  audio.addEventListener('ended', ()=>{ if(state.loop==='one'){ audio.currentTime = 0; audio.play(); return; } nextTrack(); });
+
+  // ---------- Big player show/hide ----------
+    function showBig(v){
+      const bpLayer = document.getElementById('bpLayer');
+      const bpBackdrop = document.getElementById('bpBackdrop');
+      const bpBg = document.getElementById('bpBg');
+      const bigPlayer = document.getElementById('bigPlayer');
+
+      if(v){
+        bigPlayer.classList.remove('hidden');
+        bpBackdrop.style.display = 'block';
+        bpBg.style.display = 'block';
+        bpLayer.style.display = 'flex';
+
+        // Force layout then animate
+        bpLayer.classList.remove('bp-show');
+        bpLayer.classList.remove('bp-enter');
+        bpLayer.classList.add('bp-enter');
+        requestAnimationFrame(()=>{
+          bpLayer.classList.add('bp-show');
+          bpLayer.classList.remove('bp-enter');
+        });
+
+        // ensure the shell scroll is at top so controls don't get pushed down if user had scrolled
+        const shell = document.getElementById('bpShell');
+        if(shell) shell.scrollTop = 0;
+
+        // ensure cover object-position center (defensive)
+        const cover = document.getElementById('bpCover');
+        if(cover){ cover.style.objectFit = 'cover'; cover.style.objectPosition = 'center center'; }
+      } else {
+        bpLayer.classList.remove('bp-show');
+        setTimeout(()=>{
+          bpLayer.style.display = 'none';
+          bpBackdrop.style.display = 'none';
+          bpBg.style.display = 'none';
+          bigPlayer.classList.add('hidden');
+        }, 260);
+        // hide menu if visible
+        const menu = document.getElementById('bpMenu');
+        if(menu) menu.classList.add('hidden');
+      }
+    }
+
+
+  // ---------- Cover blur + tint ----------
+  async function applyCoverBlur(url){
+    const el = $('#bpBg');
+    if(state._artUrl){ try{ URL.revokeObjectURL(state._artUrl); }catch(e){} state._artUrl = null; }
+    if(!url){ el.style.background='radial-gradient(circle at 20% 20%, rgba(124,58,237,0.12), rgba(12,12,12,0.6))'; el.style.filter='blur(28px) saturate(1.05)'; el.style.opacity = '0.7'; return; }
+    try{
+      const r = await fetch(url, {mode:'cors'}); if(!r.ok) throw new Error('fetch fail'); const blob = await r.blob(); const obj = URL.createObjectURL(blob); state._artUrl = obj;
+      el.style.backgroundImage = `linear-gradient(rgba(6,6,8,0.35), rgba(6,6,8,0.35)), url(${obj})`;
+      el.style.backgroundSize='cover'; el.style.backgroundPosition='center'; el.style.filter='blur(28px) saturate(1.05)'; el.style.opacity = '0.9';
+      try{
+        const img = await createImageBitmap(blob);
+        const cnv = document.createElement('canvas'); cnv.width = 36; cnv.height = 36; const ctx = cnv.getContext('2d'); ctx.drawImage(img,0,0,36,36);
+        const d = ctx.getImageData(0,0,36,36).data; let rsum=0,gsum=0,bsum=0,count=0; for(let i=0;i<d.length;i+=4){ rsum+=d[i]; gsum+=d[i+1]; bsum+=d[i+2]; count++; }
+        const rAvg=Math.round(rsum/count), gAvg=Math.round(gsum/count), bAvg=Math.round(bsum/count);
+        const overlay = `linear-gradient(rgba(${Math.floor(rAvg*0.12)},${Math.floor(gAvg*0.12)},${Math.floor(bAvg*0.12)},0.75), rgba(6,6,8,0.35))`;
+        el.style.backgroundImage = `${overlay}, url(${obj})`;
+      }catch(e){}
+    }catch(e){
+      el.style.background='radial-gradient(circle at 30% 20%, rgba(124,58,237,0.10), rgba(12,12,12,0.6))'; el.style.filter='blur(28px)'; el.style.opacity='0.9';
+    }
+  }
+
+  // ---------- SERVICE WORKER + notifications ----------
+  async function registerSW(){
+    if(!('serviceWorker' in navigator)) return null;
+    try{
+      const swCode = `
+        self.addEventListener('install', e=>self.skipWaiting());
+        self.addEventListener('activate', e=>self.clients.claim());
+        self.addEventListener('notificationclick', function(event){
+          event.notification.close();
+          const action = event.action || 'default';
+          event.waitUntil(
+            clients.matchAll({includeUncontrolled:true, type:'window'}).then(function(clientList){
+              if(clientList.length>0){
+                clientList[0].postMessage({type:'notification-action', action:action});
+              } else {
+                clients.openWindow('/');
+              }
+            })
+          );
+        });
+      `;
+      const blob = new Blob([swCode], {type:'application/javascript'}); const url = URL.createObjectURL(blob);
+      const reg = await navigator.serviceWorker.register(url);
+      await navigator.serviceWorker.ready;
+      swReg = reg;
+      return reg;
+    }catch(e){ console.warn('sw reg error', e); return null; }
+  }
+
+  async function showPlaybackNotification(meta, isPlaying){
+    try{
+      if(!('Notification' in window)) return;
+      const perm = await Notification.requestPermission();
+      if(perm !== 'granted') return;
+      const reg = swReg || await navigator.serviceWorker.getRegistration();
+      if(!reg) return;
+      const icon = meta.thumb || APP_ICON;
+      const options = {
+        body: meta.artist || '',
+        icon: icon,
+        badge: APP_ICON,
+        tag: 'now-playing',
+        renotify: true,
+        silent: true,
+        data: { id: meta.id || '', title: meta.title, artist: meta.artist },
+        actions: [
+          {action:'prev', title:'Önceki'},
+          {action:'toggle', title: isPlaying? 'Durdur' : 'Oynat'},
+          {action:'next', title:'Sonraki'}
+        ]
+      };
+      await reg.showNotification(meta.title || 'Çalıyor', options);
+    }catch(e){ console.warn('notif show fail', e); }
+  }
+
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.addEventListener('message', (e)=>{ try{ if(!e.data) return; if(e.data.type === 'notification-action'){ const a = e.data.action; if(a === 'prev') prevTrack(); else if(a === 'next') nextTrack(); else if(a === 'toggle'){ if(audio.paused) audio.play(); else audio.pause(); } } }catch(err){} });
+  }
+
+  // ---------- media session ----------
+  async function setMediaSession(meta){
+    if(!('mediaSession' in navigator)) return;
+    try{
+      const artwork=[];
+      if(meta.thumb){
+        try{ const r = await fetch(meta.thumb, {mode:'cors'}); if(r.ok){ const b = await r.blob(); const u = URL.createObjectURL(b); artwork.push({src:u,sizes:'512x512'}); } }catch(e){}
+      }
+      artwork.push({src:APP_ICON,sizes:'96x96'});
+      navigator.mediaSession.metadata = new MediaMetadata({ title:meta.title, artist:meta.artist, artwork });
+      navigator.mediaSession.setActionHandler('previoustrack', ()=> prevTrack());
+      navigator.mediaSession.setActionHandler('nexttrack', ()=> nextTrack());
+      navigator.mediaSession.setActionHandler('play', ()=> audio.play());
+      navigator.mediaSession.setActionHandler('pause', ()=> audio.pause());
+      navigator.mediaSession.playbackState = 'playing';
+    }catch(e){ console.warn('mediaSession err', e); }
+  }
+
+  // ---------- download + persist (sets cached flag) ----------
+  async function downloadTrack(id){
+    try{
+      const cache = await caches.open('violet-audio-v3');
+      const res = await fetch(streamUrl(id));
+      if(!res.ok) throw new Error('fetch fail');
+      await cache.put(streamUrl(id), res.clone());
+      const meta = await apiInfo(id);
+      meta.cached = true; meta.cachedAt = Date.now();
+      await idbPut('tracks', meta);
+      // update current state if matches
+      if(state.current && state.current.id === id) state.current.cached = true;
+      // update UI
+      updateBpMenuButtons();
+      loadPlaylists();
+      return true;
+    }catch(e){ console.warn(e); return false; }
+  }
+
+  // ---------- share ----------
+  function shareCurrent(){ if(!state.current) return toast('Çalınan şarkı yok'); const code = LZ.compressToEncodedURIComponent(state.current.id); const url = `${location.origin}${location.pathname}#song=${code}`; if(navigator.share){ navigator.share({ title:state.current.title, text:state.current.artist, url }).catch(()=>{}); } else { navigator.clipboard.writeText(url).then(()=> toast('Bağlantı panoya kopyalandı')); } }
+
+  // ---------- add to playlist (prestore meta + duplicate check) ----------
+  async function addToPlaylistPrompt(trackId){
+    const pls = await idbAll('playlists');
+    if(pls.length===0) return toast('Önce bir liste oluştur');
+    // ensure meta stored so playlist displays info
+    try{
+      const meta = await apiInfo(trackId);
+      if(meta) await idbPut('tracks', Object.assign({cached:false}, meta));
+    }catch(e){ console.warn('meta store fail', e); }
+    const shell=document.createElement('div'); shell.className='fixed inset-0 z-[20000]'; shell.innerHTML = `<div class="absolute inset-0 bg-black/60"></div><div class="absolute inset-x-6 top-1/3 bg-zinc-950 rounded-xl p-3">${pls.map(p=>`<button data-id="${p.id}" class="w-full text-left px-3 py-2 rounded hover:bg-zinc-800">${p.name}</button>`).join('')}</div>`; document.body.appendChild(shell);
+    shell.querySelectorAll('button').forEach(b=> b.addEventListener('click', async ()=>{
+      const id=b.dataset.id; const pl = await idbGet('playlists', id);
+      pl.tracks = pl.tracks || [];
+      if(pl.tracks.includes(trackId)){ toast('Zaten eklendi'); shell.remove(); return; }
+      pl.tracks.push(trackId); await idbPut('playlists', pl); shell.remove(); toast('Listeye eklendi'); loadPlaylists();
+    }));
+    shell.addEventListener('click',(e)=>{ if(e.target===shell) shell.remove(); });
+  }
+
+  // ---------- Playlist modal (if offline -> show only cached tracks) ----------
+  async function openPlaylistModal(plId){
+    const pl = await idbGet('playlists', plId);
+    if(!pl) return toast('Liste bulunamadı');
+    const shell = document.createElement('div'); shell.className='fixed inset-0 z-[20000]';
+    shell.innerHTML = `
+      <div class="absolute inset-0"></div>
+      <div id="sheet" class="bottom-sheet sheet-enter" style="bottom:120px; max-height:76vh; padding:12px 16px;">
+        <button class="sheetClose" id="sheetClose">×</button>
+        <div class="sheet-header mb-3">
+          <img src="${pl.cover||''}" class="w-14 h-14 rounded-lg object-cover"/>
+          <div class="flex-1">
+            <div class="text-sm font-semibold">${pl.name}</div>
+            <div class="text-xs text-zinc-400">${(pl.tracks||[]).length} parça</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="px-3 py-2 rounded-xl btn-main playAll">Tümünü Çal</button>
+            <button class="px-3 py-2 rounded-xl btn-ghost deleteList">Sil</button>
+          </div>
+        </div>
+        <div id="plSongs" style="overflow:auto; max-height:60vh; padding-bottom:20px"></div>
+      </div>`;
+    document.body.appendChild(shell);
+    const sheet = shell.querySelector('#sheet'); requestAnimationFrame(()=>{ sheet.classList.add('sheet-show'); sheet.classList.remove('sheet-enter'); });
+    shell.querySelector('#sheetClose').addEventListener('click', ()=> shell.remove());
+    shell.querySelector('.playAll').addEventListener('click', ()=>{ if(pl.tracks && pl.tracks.length){ // if offline: only cached tracks must be played
+        (async()=>{
+          const toPlay = state.offline ? (await Promise.all(pl.tracks.map(t=>idbGet('tracks',t)))).filter(x=>x&&x.cached).map(x=>x.id) : pl.tracks.slice();
+          if(!toPlay.length){ toast('Oynatılacak indirilen parça yok'); return; }
+          state.queue = toPlay; state.index = 0; playById(state.queue[0], state.queue); shell.remove();
+        })();
+    }});
+    shell.querySelector('.deleteList').addEventListener('click', async ()=>{ if(confirm('Bu listeyi silmek istediğinizden emin misiniz?')){ await idbDelete('playlists', pl.id); shell.remove(); loadPlaylists(); toast('Liste silindi'); } });
+
+    const list = shell.querySelector('#plSongs');
+    // build array depending on offline flag
+    const tracksToShow = [];
+    for(let i=0;i<(pl.tracks||[]).length;i++){
+      const tid = pl.tracks[i];
+      const meta = await idbGet('tracks', tid);
+      if(state.offline){
+        if(meta && meta.cached) tracksToShow.push(meta);
+      } else {
+        tracksToShow.push(meta || {id:tid,title:tid,artist:'',thumb:''});
+      }
+    }
+    if(tracksToShow.length===0){
+      list.innerHTML = '<div class="text-zinc-400 py-3">Gösterilecek parça yok</div>';
+    } else {
+      for(const meta of tracksToShow){
+        const tid = meta.id;
+        const row=document.createElement('div'); row.className='glass rounded-xl p-3 flex items-center gap-3 mb-2';
+        row.innerHTML = `<img src="${meta.thumb||''}" class="w-12 h-12 rounded-lg object-cover"/><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">${meta.title||tid}</div><div class="text-xs text-zinc-400 truncate">${meta.artist||''}</div></div><div class="flex gap-2"><button class="px-3 py-2 rounded-xl btn-main playHere">Çal</button><button class="px-3 py-2 rounded-xl btn-ghost remove">Kaldır</button></div>`;
+        list.appendChild(row);
+        row.querySelector('.playHere').addEventListener('click', ()=>{ state.queue = pl.tracks.slice().filter(x=>!(state.offline && !( (async()=> (await idbGet('tracks',x))?.cached)()))); state.index = state.queue.indexOf(tid); playById(tid, state.queue); shell.remove(); });
+        row.querySelector('.remove').addEventListener('click', async ()=>{ pl.tracks = pl.tracks.filter(x=>x!==tid); await idbPut('playlists', pl); row.remove(); loadPlaylists(); });
+      }
+    }
+    shell.addEventListener('click',(e)=>{ if(e.target===shell) shell.remove(); });
+  }
+
+  // ---------- Edit playlist (unchanged) ----------
+  async function editPlaylistModal(plId){
+    const pl = await idbGet('playlists', plId);
+    if(!pl) return;
+    const shell=document.createElement('div'); shell.className='fixed inset-0 z-[20000]';
+    shell.innerHTML = `<div class="absolute inset-0"></div><div id="sheet" class="bottom-sheet sheet-enter" style="bottom:120px; padding:12px 16px; max-height:55vh; overflow:auto;"><button class="sheetClose" id="sheetClose">×</button><input id="eName" class="w-full bg-transparent p-2 rounded-xl mb-2" value="${pl.name}"/><input id="eCover" class="w-full bg-transparent p-2 rounded-xl mb-2" placeholder="Kapak url" value="${pl.cover||''}"/><div class="flex justify-between mt-2"><button id="eCancel" class="px-3 py-2 rounded-xl btn-ghost">İptal</button><div class="flex gap-2"><button id="eDelete" class="px-3 py-2 rounded-xl btn-ghost">Sil</button><button id="eSave" class="px-3 py-2 rounded-xl btn-main">Kaydet</button></div></div></div>`;
+    document.body.appendChild(shell);
+    const sheet=shell.querySelector('#sheet'); requestAnimationFrame(()=>{ sheet.classList.add('sheet-show'); sheet.classList.remove('sheet-enter'); });
+    shell.querySelector('#sheetClose').addEventListener('click', ()=> shell.remove());
+    shell.querySelector('#eCancel').addEventListener('click', ()=> shell.remove());
+    shell.querySelector('#eDelete').addEventListener('click', async ()=>{ if(confirm('Bu listeyi silmek istiyor musunuz?')){ await idbDelete('playlists', pl.id); shell.remove(); loadPlaylists(); toast('Silindi'); } });
+    shell.querySelector('#eSave').addEventListener('click', async ()=>{ pl.name = shell.querySelector('#eName').value.trim()||pl.name; pl.cover = shell.querySelector('#eCover').value.trim(); await idbPut('playlists', pl); shell.remove(); loadPlaylists(); toast('Kaydedildi'); });
+    shell.addEventListener('click',(e)=>{ if(e.target===shell) shell.remove(); });
+  }
+
+  // ---------- Update bpMenu download button state ----------
+  async function updateBpMenuButtons(){
+    const dlBtn = $('#bpMenuDownload');
+    if(!dlBtn) return;
+    if(!state.current) { dlBtn.textContent='İndir'; dlBtn.disabled=false; return; }
+    const t = await idbGet('tracks', state.current.id);
+    if(t && t.cached){ dlBtn.textContent = 'İndirildi ✓'; dlBtn.disabled = true; }
+    else { dlBtn.textContent = 'İndir'; dlBtn.disabled = false; }
+  }
+
+  // ---------- Loop / Shuffle UI ----------
+  function updateLoopUI(){ const el = $('#bpLoop'); const badge = $('#loopBadge'); const wrap = $('#loopIconWrap'); wrap.innerHTML=''; if(state.loop === 'off'){ wrap.innerHTML = `<svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M21 15v4h-4M3 9V5h4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`; badge.classList.add('hidden'); el.classList.remove('on'); } else if(state.loop === 'one'){ wrap.innerHTML = `<svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M7 7h9l-3 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`; badge.classList.remove('hidden'); badge.textContent = '1'; el.classList.add('on'); } else { wrap.innerHTML = `<svg viewBox="0 0 24 24" class="w-5 h-5"><path d="M7 7h9l-3 3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/></svg>`; badge.classList.remove('hidden'); badge.innerHTML = '∞'; el.classList.add('on'); } }
+  $('#bpLoop').addEventListener('click', ()=>{ state.loop = state.loop==='off'?'one':(state.loop==='one'?'all':'off'); updateLoopUI(); });
+
+  $('#bpShuffle').addEventListener('click', ()=>{ state.shuffle = !state.shuffle; $('#bpShuffle').classList.toggle('on', state.shuffle); });
+
+  // ---------- Controls binding ----------
+  $('#bpPlay').addEventListener('click', ()=> $('#miniPlay').click());
+  $('#miniPlay').addEventListener('click', ()=>{ if(audio.paused) audio.play().then(()=>setPlayIcon(true)).catch(()=>{}); else { audio.pause(); setPlayIcon(false); } });
+  $('#miniNext').addEventListener('click', ()=> nextTrack()); $('#miniPrev').addEventListener('click', ()=> prevTrack()); $('#bpNext').addEventListener('click', ()=> nextTrack()); $('#bpPrev').addEventListener('click', ()=> prevTrack());
+
+  $('#bpMenuBtn').addEventListener('click', (e)=>{ e.stopPropagation(); $('#bpMenu').classList.toggle('hidden'); updateBpMenuButtons(); });
+  document.addEventListener('click', ()=>{ $('#bpMenu').classList.add('hidden'); });
+
+  $('#bpClose').addEventListener('click', ()=> showBig(false));
+
+  // bpMenu actions
+  $('#bpMenu').addEventListener('click', async (e)=>{ e.stopPropagation(); const a=e.target.dataset.action; if(a==='download' || e.target.id==='bpMenuDownload'){ if(state.current){ const t = await idbGet('tracks', state.current.id); if(t && t.cached){ toast('Zaten indirildi'); } else { const ok = await downloadTrack(state.current.id); toast(ok ? 'İndirildi' : 'İndirme başarısız'); } } } if(a==='share') shareCurrent(); if(a==='add' && state.current) addToPlaylistPrompt(state.current.id); $('#bpMenu').classList.add('hidden'); updateBpMenuButtons(); });
+
+  // ---------- Playlists render with delete button ----------
+  async function loadPlaylists(){ const pls = await idbAll('playlists'); renderPlaylists(pls); }
+  function renderPlaylists(pls){
+    const wrap=$('#playlists'); wrap.innerHTML='';
+    for(const p of pls){
+      const el=document.createElement('div'); el.className='glass rounded-xl p-3 flex items-center gap-3 lift';
+      el.innerHTML = `<img src="${p.cover||''}" class="w-14 h-14 rounded-lg object-cover"/><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">${p.name}</div><div class="text-xs text-zinc-400">${(p.tracks||[]).length} parça</div></div><div class="flex items-center gap-2"><button class="openBtn px-3 py-2 rounded-xl btn-main">Aç</button><button class="editBtn px-3 py-2 rounded-xl btn-ghost">Düzenle</button><button class="delBtn px-3 py-2 rounded-xl btn-ghost text-red-400">Sil</button></div>`;
+      wrap.appendChild(el);
+      el.querySelector('.openBtn').addEventListener('click', ()=> openPlaylistModal(p.id));
+      el.querySelector('.editBtn').addEventListener('click', ()=> editPlaylistModal(p.id));
+      el.querySelector('.delBtn').addEventListener('click', async ()=>{ if(confirm('Bu listeyi silmek istiyor musunuz?')){ await idbDelete('playlists', p.id); loadPlaylists(); toast('Silindi'); } });
+    }
+    if(pls.length===0) wrap.innerHTML = '<div class="text-zinc-400 py-3">Henüz bir liste yok — oluştur</div>';
+  }
+
+  // ---------- Utilities ----------
+  async function ensureSWandPerm(){ try{ const reg = await registerSW(); if(reg) console.log('sw ready'); }catch(e){} }
+
+  // ---------- boot ----------
+  async function boot(){
+    await idbInit(); await ensureSWandPerm();
+    $('#searchBtn').addEventListener('click', ()=>{ const q=$('#searchInput').value.trim(); if(q) doSearch(q); });
+    $('#createPlaylistBtn').addEventListener('click', async ()=>{ const name=$('#newPlaylistName').value.trim(); if(!name) return toast('İsim gir'); const id=crypto.randomUUID(); await idbPut('playlists',{id,name,cover:'',tracks:[]}); $('#newPlaylistName').value=''; loadPlaylists(); toast('Liste oluşturuldu'); });
+    $('#miniExpand').addEventListener('click', ()=> showBig(true)); $('#miniBar').addEventListener('click', (e)=>{ if(e.target.closest('button')) return; showBig(true); });
+
+    // set padding so content not covered by mini player
+    document.getElementById('mainContent').style.paddingBottom = '260px';
+
+    // deep-link
+    if(location.hash.startsWith('#song=')){ try{ const code = location.hash.split('=')[1]; const id = LZ.decompressFromEncodedURIComponent(code); if(id) { await playById(id); showBig(true); } }catch(e){} }
+
+    // initial UI
+    loadPlaylists(); $('#results').innerHTML = '<div class="text-zinc-400 py-3">Arama yap</div>';
+    updateLoopUI();
+
+    // if offline at start, enable offline mode
+    if(!navigator.onLine){ state.offline = true; $('#offlineToggle').checked = true; updateOfflineToggleVisual(true); renderOfflineList(); }
+
+    // quick UI sync for download button
+    setInterval(updateBpMenuButtons, 1200);
+  }
+
+    // helper: yüzdeye göre linear-gradient ayarla (doldurulan kısmı accent ile göster)
+    function updateRangeFill(inputEl){
+      const val = Number(inputEl.value || 0);
+      const pct = Math.max(0, Math.min(100, val));
+      // accent color - burayı istersen css değişkeni ile eşitleyebilirsin
+      const accent = 'rgba(124,58,237,0.95)'; // mor tonun
+      const bg = `linear-gradient(90deg, ${accent} ${pct}%, rgba(255,255,255,0.06) ${pct}%)`;
+      inputEl.style.background = bg;
+    }
+
+    // Attach seek handling for a range input, keeping times synced
+    function wireSeekInput(rangeEl, showTimeEl){
+      // güncelleme yapıldığında (sürüklerken) anlık preview ver (canlı seek)
+      rangeEl.addEventListener('input', (e) => {
+        updateRangeFill(rangeEl);
+        const pct = Number(rangeEl.value || 0) / 100;
+        if(audio.duration && isFinite(audio.duration)){
+          const t = pct * audio.duration;
+          // showTimeEl varsa anlık zamanı göster
+          if(showTimeEl) showTimeEl.textContent = fmtTime(t);
+          // canlı olarak atamak istersen:
+          // audio.currentTime = t;   // Eğer "sürüklerken anında atama" istemezsen bunu yorum satırına al
+        }
+      });
+
+      // bırakıldığında veya değişiklik tamamlandığında gerçek seek işlemini uygula
+      // 'change' event mobilde bazen yalnızca bırakınca tetiklenir; pointerup daha güvenli
+      rangeEl.addEventListener('change', (e) => {
+        if(audio.duration && isFinite(audio.duration)){
+          const pct = Number(rangeEl.value || 0) / 100;
+          audio.currentTime = pct * audio.duration;
+        }
+      });
+
+      // ekstra: mouse/touch bırakma için (bazı tarayıcılar change'yi geciktirebilir)
+      ['mouseup','touchend','pointerup'].forEach(ev => {
+        rangeEl.addEventListener(ev, (e) => {
+          if(audio.duration && isFinite(audio.duration)){
+            const pct = Number(rangeEl.value || 0) / 100;
+            audio.currentTime = pct * audio.duration;
+          }
+        });
+      });
+
+      // init fill
+      updateRangeFill(rangeEl);
+    }
+
+    // wire both bpSeek (big player) and miniSeek
+    const bpSeekEl = document.getElementById('bpSeek');
+    const miniSeekEl = document.getElementById('miniSeek');
+    wireSeekInput(bpSeekEl, document.getElementById('bpCur'));
+    if(miniSeekEl) wireSeekInput(miniSeekEl, null);
+
+    // update fill as audio plays
+    audio.addEventListener('timeupdate', ()=>{
+      if(audio.duration){
+        const pct = (audio.currentTime / audio.duration) * 100;
+        if(bpSeekEl){
+          bpSeekEl.value = pct;
+          updateRangeFill(bpSeekEl);
+          document.getElementById('bpCur').textContent = fmtTime(audio.currentTime);
+        }
+        if(miniSeekEl){
+          miniSeekEl.value = pct;
+          updateRangeFill(miniSeekEl);
+        }
+      }
+    });
+
+
+  boot();
+  </script>
+</body>
+</html>
