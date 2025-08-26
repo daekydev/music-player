@@ -495,7 +495,7 @@ if ('serviceWorker' in navigator) {
       await applyCoverBlur(meta.thumb);
       await setMediaSession(meta);
       await showPlaybackNotification(meta, true).catch(e => console.log('Bildirim hatası:', e));
-    
+    await updateUI(meta);
       // ensure bpMenuDownload UI reflects cached state
       updateBpMenuButtons();
     }catch(e){ console.warn(e); }
