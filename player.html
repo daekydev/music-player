@@ -581,7 +581,16 @@ if ('serviceWorker' in navigator) {
   }
 
   // ---------- SERVICE WORKER + notifications ----------
-  
+
+    async function testNotif() {
+  await Notification.requestPermission();
+  const reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) return console.log('SW bulunamadı');
+  reg.showNotification('Test Notification', { body:'Çalışıyor mu?', silent:true });
+}
+
+testNotif();
+
 
   async function showPlaybackNotification(meta, isPlaying){
     try{
