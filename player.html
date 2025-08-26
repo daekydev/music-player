@@ -594,7 +594,7 @@ if ('serviceWorker' in navigator) {
       if(!('Notification' in window)) return;
       const perm = await Notification.requestPermission();
       if(perm !== 'granted') return;
-      const reg = swReg || await navigator.serviceWorker.getRegistration();
+      const reg = await navigator.serviceWorker.getRegistration();
       if(!reg) return;
       const icon = meta.thumb || APP_ICON;
       const options = {
@@ -603,7 +603,8 @@ if ('serviceWorker' in navigator) {
         badge: APP_ICON,
         tag: 'now-playing',
         renotify: true,
-              };
+        data: { id: meta.id || '', title: meta.title, artist: meta.artist }
+          };
       await reg.showNotification(meta.title || 'Çalıyor', options);
     }catch(e){ console.warn('notif show fail', e); }
   }
