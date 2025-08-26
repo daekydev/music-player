@@ -76,8 +76,6 @@ try { app.use(favicon(path.join(__dirname, 'public','icons','icon-192.png'))); }
 
 
 // __dirname benzeri çözüm (ESM için)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "player.html"));
