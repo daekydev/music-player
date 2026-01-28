@@ -119,7 +119,7 @@ app.get('/stream/:videoId', async (req, res) => {
       type: 'audio', // audio, video or video+audio
       quality: 'best', // best, bestefficiency, 144p, 240p, 480p, 720p and so on.
       format: 'mp4', // media container format,
-          client: 'WEB'
+          client: 'WEB_EMBEDDED'
     });
 
     let range = 'bytes=0-';
